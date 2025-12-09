@@ -1,0 +1,61 @@
+{
+  "name": "@supplygraph/database",
+  "version": "1.0.0",
+  "description": "Database package for SupplyGraph with Prisma ORM",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./src/schema/index.ts",
+      "default": "./src/schema/index.ts"
+    },
+    "./seed": {
+      "types": "./src/seed/index.ts",
+      "default": "./src/seed/index.ts"
+    },
+    "./migrations": "./migrations"
+  },
+  "scripts": {
+    "dev": "prisma generate --watch",
+    "generate": "prisma generate",
+    "push": "dotenv -e .env -- prisma db push",
+    "migrate": "dotenv -e .env -- prisma migrate dev",
+    "migrate:deploy": "dotenv -e .env -- prisma migrate deploy",
+    "migrate:reset": "dotenv -e .env -- prisma migrate reset",
+    "studio": "dotenv -e .env -- prisma studio",
+    "seed": "pnpm generate && dotenv -e .env -- tsx src/seed/index.ts",
+    "seed:dev": "tsx watch src/seed/index.ts",
+    "build": "pnpm generate && tsc",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write src/**/*.ts",
+    "db:diagram": "prisma db docs --schema=./prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^5.22.0",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^2.30.0",
+    "nanoid": "^3.3.7",
+    "prisma": "^5.22.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.2",
+    "dotenv-cli": "^11.0.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^1.6.0"
+  },
+  "prisma": {
+    "seed": "tsx src/seed/index.ts",
+    "schema": "prisma/schema.prisma"
+  }
+}

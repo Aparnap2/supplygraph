@@ -1,0 +1,24 @@
+{
+  "projectName": "web",
+  "mode": "file-router",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "pnpm",
+  "addOnOptions": {
+    "prisma": {
+      "database": "postgres"
+    }
+  },
+  "git": true,
+  "version": 1,
+  "framework": "react-cra",
+  "chosenAddOns": [
+    "eslint",
+    "netlify",
+    "start",
+    "prisma",
+    "table",
+    "shadcn",
+    "t3env"
+  ]
+}

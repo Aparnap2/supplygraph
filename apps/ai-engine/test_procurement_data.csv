@@ -1,0 +1,6 @@
+item_name,category,quantity,unit_price,priority,description
+Office Chairs,Furniture,10,150.00,HIGH,Ergonomic office chairs with lumbar support
+Laptops,IT Equipment,5,1200.00,MEDIUM,Dell Latitude business laptops
+Standing Desks,Furniture,15,450.00,HIGH,Adjustable standing desks
+Monitors,IT Equipment,10,300.00,MEDIUM,24-inch LED monitors
+Printer Supplies,Office Supplies,20,25.00,LOW,Toner cartridges and paper

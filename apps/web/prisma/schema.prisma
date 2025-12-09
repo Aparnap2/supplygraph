@@ -1,0 +1,749 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================================================================
+// Multi-Tenancy Core Models (Better Auth Integration)
+// ====================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("account")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          Role      @default(USER)
+
+  // Better Auth relations
+  accounts      Account[]
+  sessions      Session[]
+  memberships   Member[]
+
+  // SupplyGraph relations
+  createdRequests ProcurementRequest[] @relation("RequestCreator")
+  auditLogs      AuditLog[]
+  activities     Activity[] @relation("ActivityUser")
+
+  @@map("user")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_token")
+}
+
+// Multi-tenant Organization model
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  logo        String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Multi-tenancy relations
+  members     Member[]
+
+  // SupplyGraph domain models
+  inventory   Product[]
+  procurements ProcurementRequest[]
+  vendors      Vendor[]
+  quotes       Quote[]
+  categories   Category[]
+  departments  Department[]
+  auditLogs    AuditLog[]
+  
+  // Additional relations
+  templates    ProcurementTemplate[]
+  langGraphThreads LangGraphThread[]
+  aiSuggestions AISuggestion[]
+  activities  Activity[]
+
+  // Settings and preferences
+  settings     OrganizationSettings?
+
+  // Gmail integration
+  gmailCredentials GmailCredentials?
+
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganizationRole @default(MEMBER)
+  invitedBy      String?
+  joinedAt       DateTime     @default(now())
+  lastLoginAt    DateTime?
+
+  // Relations for department management and approvals
+  managedDepartments Department[] @relation("DepartmentManager")
+  approvedRequests  ProcurementRequest[] @relation("RequestApprover")
+
+  @@unique([organizationId, userId])
+  @@map("member")
+}
+
+model OrganizationSettings {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Workflow settings
+  approvalRequired   Boolean  @default(true)
+  approvalAmount     Float    @default(1000.00)
+  autoVendorMatching Boolean  @default(true)
+
+  // Notification settings
+  emailNotifications Boolean  @default(true)
+  slackWebhook      String?
+
+  // Integration settings
+  stripeEnabled     Boolean  @default(false)
+  stripeAccountId   String?
+
+  // Customization
+  currency          String   @default("USD")
+  timezone          String   @default("UTC")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("organization_settings")
+}
+
+// ====================================================================
+// Supply Management Models
+// ====================================================================
+
+model Category {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  slug           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentId       String?
+  parent         Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children       Category[]   @relation("CategoryHierarchy")
+
+  products       Product[]
+  templates      ProcurementTemplate[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, slug])
+  @@map("category")
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  code           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  budget         Float?
+  managerId      String?
+  manager        Member?      @relation("DepartmentManager", fields: [managerId], references: [id])
+
+  requests       ProcurementRequest[]
+  templates      ProcurementTemplate[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, code])
+  @@map("department")
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  sku            String       @unique
+  name           String
+  description    String?
+  categoryId     String
+  category       Category     @relation(fields: [categoryId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Product details
+  unit           String       @default("each")
+  unitPrice      Float?
+  currentStock   Int          @default(0)
+  minStock       Int          @default(0)
+  maxStock       Int?
+  reorderPoint   Int?
+  supplier       String?
+
+  // Specifications (JSON)
+  specifications Json?
+  images         String[]
+  tags           String[]
+
+  // Audit
+  createdBy      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  procurementItems ProcurementItem[]
+  quoteItems     QuoteItem[]
+
+  @@unique([organizationId, sku])
+  @@map("product")
+}
+
+model Vendor {
+  id             String       @id @default(cuid())
+  name           String
+  email          String?      @unique
+  phone          String?
+  website        String?
+  description    String?
+
+  // Address
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  country        String?
+  postalCode     String?
+
+  // Business details
+  taxId          String?
+  paymentTerms   String?
+  rating         Float?
+
+  // Multi-tenancy
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  contacts       VendorContact[]
+  quotes         Quote[]
+  contracts      VendorContract[]
+
+  // Metadata
+  tags           String[]
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("vendor")
+}
+
+model VendorContact {
+  id       String @id @default(cuid())
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name     String
+  title    String?
+  email    String
+  phone    String?
+  isPrimary Boolean @default(false)
+
+  @@map("vendor_contact")
+}
+
+model VendorContract {
+  id           String   @id @default(cuid())
+  vendorId     String
+  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  contractNumber String @unique
+  startDate    DateTime
+  endDate      DateTime?
+  terms        String   @db.Text
+  autoRenew    Boolean  @default(false)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("vendor_contract")
+}
+
+// ====================================================================
+// Procurement Workflow Models
+// ====================================================================
+
+model ProcurementRequest {
+  id             String            @id @default(cuid())
+  requestNumber  String            @unique
+  title          String
+  description    String?           @db.Text
+
+  // Multi-tenancy
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Requester info
+  requesterId    String
+  requester      User              @relation("RequestCreator", fields: [requesterId], references: [id])
+  departmentId   String?
+  department     Department?       @relation(fields: [departmentId], references: [id])
+
+  // Workflow
+  status         ProcurementStatus @default(DRAFT)
+  priority       Priority          @default(MEDIUM)
+
+  // LangGraph integration
+  threadId       String            @unique
+  workflowState  Json?
+
+  // Items and quotes
+  items          ProcurementItem[]
+  quotes         Quote[]
+
+  // Financial
+  totalAmount    Float?
+  currency       String            @default("USD")
+
+  // Approval
+  requiresApproval Boolean         @default(false)
+  approverId     String?
+  approver       Member?           @relation("RequestApprover", fields: [approverId], references: [id])
+  approvedAt     DateTime?
+  approvedBy     String?
+
+  // Timeline
+  neededBy       DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  completedAt    DateTime?
+
+  // Relations
+  langGraphThreads LangGraphThread[]
+  aiSuggestions AISuggestion[]
+
+  @@map("procurement_request")
+}
+
+model ProcurementItem {
+  id                String            @id @default(cuid())
+  requestId         String
+  request           ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           Product?          @relation(fields: [productId], references: [id])
+
+  // Item details
+  name              String
+  description       String?
+  quantity          Int
+  unit              String            @default("each")
+  unitPrice         Float?
+  totalPrice        Float?
+
+  // Specifications
+  specifications     Json?
+
+  // Status
+  status            ItemStatus        @default(PENDING)
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  quoteItems        QuoteItem[]
+
+  @@map("procurement_item")
+}
+
+model ProcurementTemplate {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+
+  // Multi-tenancy
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     Department?  @relation(fields: [departmentId], references: [id])
+  categoryId     String?
+  category       Category?    @relation(fields: [categoryId], references: [id])
+
+  // Template content
+  items          Json         // Array of item templates
+  workflow       Json?        // Default workflow configuration
+  approvalRules  Json?        // Approval automation rules
+
+  // Metadata
+  isActive       Boolean      @default(true)
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("procurement_template")
+}
+
+// ====================================================================
+// Quote Management Models
+// ====================================================================
+
+model Quote {
+  id             String       @id @default(cuid())
+  quoteNumber    String       @unique
+
+  // Relations
+  requestId      String
+  request        ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  vendorId       String
+  vendor         Vendor       @relation(fields: [vendorId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Quote details
+  status         QuoteStatus  @default(DRAFT)
+  validUntil     DateTime?
+
+  // Pricing
+  subtotal       Float
+  tax            Float        @default(0)
+  shipping       Float        @default(0)
+  totalAmount    Float
+  currency       String       @default("USD")
+
+  // Content
+  items          QuoteItem[]
+  terms          String?      @db.Text
+  notes          String?      @db.Text
+  attachments    String[]     // URLs or file paths
+
+  // Response
+  responseDate   DateTime?
+  respondedBy    String?
+
+  // Metadata
+  receivedVia    String?      // Email, Portal, API, etc.
+  aiGenerated    Boolean      @default(false)
+  confidence     Float?       // AI confidence score
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("quote")
+}
+
+model QuoteItem {
+  id       String @id @default(cuid())
+  quoteId  String
+  quote    Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  // Item reference
+  requestItemId String?
+  requestItem    ProcurementItem? @relation(fields: [requestItemId], references: [id])
+
+  // Quote item details
+  name           String
+  description    String?
+  quantity       Int
+  unit           String
+  unitPrice      Float
+  totalPrice     Float
+
+  // Product match
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id])
+
+  // Specifications
+  specifications Json?
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("quote_item")
+}
+
+// ====================================================================
+// AI and Workflow Models
+// ====================================================================
+
+model LangGraphThread {
+  id             String   @id @default(cuid())
+  threadId       String   @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestId      String?
+  request        ProcurementRequest? @relation(fields: [requestId], references: [id])
+
+  // Thread state
+  state          Json
+  status         String   @default("active") // active, paused, completed, failed
+  currentNode    String?
+  metadata       Json?
+
+  // AI analysis
+  sentiment       Float?
+  confidence     Float?
+  riskScore      Float?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  completedAt    DateTime?
+
+  // Relations
+  aiSuggestions AISuggestion[]
+
+  @@map("langgraph_thread")
+}
+
+model AISuggestion {
+  id             String       @id @default(cuid())
+  type           SuggestionType
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestId      String?
+  request        ProcurementRequest? @relation(fields: [requestId], references: [id])
+  threadId       String?
+  thread         LangGraphThread?  @relation(fields: [threadId], references: [id])
+
+  // Suggestion content
+  title          String
+  description    String
+  data           Json
+
+  // AI confidence and reasoning
+  confidence     Float
+  reasoning      String?      @db.Text
+
+  // Status
+  status         SuggestionStatus @default(PENDING)
+  appliedAt      DateTime?
+  appliedBy      String?
+
+  // Metadata
+  model          String?      // Which AI model generated this
+  version        String?      // Model version
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("ai_suggestion")
+}
+
+// ====================================================================
+// Audit and Analytics Models
+// ====================================================================
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+
+  // Action details
+  action         String       // create, update, delete, approve, etc.
+  resourceType   String       // procurement_request, quote, vendor, etc.
+  resourceId     String?
+
+  // Old and new values
+  oldValues      Json?
+  newValues      Json?
+
+  // Context
+  ipAddress      String?
+  userAgent      String?
+  sessionId      String?
+
+  // Metadata
+  requestId      String?
+  threadId       String?
+  metadata       Json?
+
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_log")
+}
+
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Activity details
+  type           ActivityType
+  title          String
+  description    String?
+
+  // Resource reference
+  resourceType   String?
+  resourceId     String?
+
+  // User context
+  userId         String?
+  user           User?        @relation("ActivityUser", fields: [userId], references: [id])
+
+  // Additional data
+  data           Json?
+
+  // Visibility
+  isPublic       Boolean      @default(false)
+  isVisibleToAll Boolean      @default(true)
+
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([type, resourceType])
+  @@map("activity")
+}
+
+// ====================================================================
+// Enums
+// ====================================================================
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum ProcurementStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  NEGOTIATING
+  PENDING_PAYMENT
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ItemStatus {
+  PENDING
+  QUOTED
+  APPROVED
+  REJECTED
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum SuggestionType {
+  VENDOR_MATCH
+  PRICE_OPTIMIZATION
+  BULK_PURCHASE
+  ALTERNATIVE_PRODUCT
+  RISK_MITIGATION
+  WORKFLOW_IMPROVEMENT
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ActivityType {
+  PROCUREMENT_CREATED
+  PROCUREMENT_UPDATED
+  PROCUREMENT_APPROVED
+  PROCUREMENT_REJECTED
+  QUOTE_RECEIVED
+  QUOTE_ACCEPTED
+  VENDOR_ADDED
+  PRODUCT_ADDED
+  CONTRACT_SIGNED
+  PAYMENT_PROCESSED
+  AI_SUGGESTION
+  SYSTEM_NOTIFICATION
+}
+
+// ====================================================================
+// Gmail OAuth Integration Model
+// ====================================================================
+
+model GmailCredentials {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  accessToken    String   @db.Text
+  refreshToken   String?  @db.Text
+  expiryDate     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("gmail_credentials")
+}

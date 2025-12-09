@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: supplygraph-postgres
+    environment:
+      POSTGRES_DB: supplygraph
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Valkey for caching and Celery (Redis-compatible)
+  valkey:
+    image: valkey/valkey:7.2.4-alpine
+    container_name: supplygraph-valkey
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI Engine (Python FastAPI + LangGraph)
+  ai-engine:
+    build:
+      context: ./apps/ai-engine
+      dockerfile: Dockerfile
+    container_name: supplygraph-ai-engine
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplygraph
+      - VALKEY_URL=valkey://valkey:6379
+      - REDIS_URL=valkey://valkey:6379  # Backward compatibility
+      - BETTER_AUTH_URL=http://web:3000/api/auth
+      - NODE_ENV=development
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - ./apps/ai-engine:/app
+      - /app/__pycache__
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker for background tasks
+  celery-worker:
+    build:
+      context: ./apps/ai-engine
+      dockerfile: Dockerfile
+    container_name: supplygraph-celery
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplygraph
+      - VALKEY_URL=valkey://valkey:6379
+      - REDIS_URL=valkey://valkey:6379  # Backward compatibility
+      - CELERY_BROKER_URL=valkey://valkey:6379/0
+      - CELERY_RESULT_BACKEND=valkey://valkey:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - ./apps/ai-engine:/app
+    command: celery -A src.tasks.celery_app worker --loglevel=info
+
+  # Web Frontend (TanStack Start)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: supplygraph-web
+    environment:
+      - VITE_AI_ENGINE_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplygraph
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-engine:
+        condition: service_healthy
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    command: pnpm dev
+
+  # Mailpit for email testing
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: supplygraph-mailpit
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI
+    environment:
+      - MP_SMTP_AUTH_ALLOW_ANY=1
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8025/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: supplygraph-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@supplygraph.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+  valkey_data:
+  pgadmin_data:
+
+networks:
+  default:
+    name: supplygraph-network

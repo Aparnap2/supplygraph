@@ -1,0 +1,44 @@
+{
+  "postgresql": {
+    "development": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "supplygraph",
+      "username": "postgres",
+      "password": "postgres",
+      "ssl": false,
+      "connectionLimit": 20,
+      "timeout": 30000,
+      "reconnect": true,
+      "reconnectDelay": 2000
+    },
+    "production": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "supplygraph",
+      "username": "postgres",
+      "password": "postgres",
+      "ssl": true,
+      "connectionLimit": 50,
+      "timeout": 60000,
+      "reconnect": true,
+      "reconnectDelay": 5000
+    },
+    "connectionStrings": {
+      "development": "postgresql://postgres:postgres@localhost:5432/supplygraph",
+      "production": "postgresql://postgres:postgres@localhost:5432/supplygraph?sslmode=require"
+    }
+  },
+  "docker": {
+    "containerName": "agentstack-db-test",
+    "internalHost": "agentstack-db-test",
+    "externalHost": "localhost",
+    "internalPort": 5432,
+    "externalPort": 5432
+  },
+  "prisma": {
+    "schemaPath": "apps/web/prisma/schema.prisma",
+    "clientPath": "apps/web/src/generated/prisma",
+    "migrationsPath": "apps/web/prisma/migrations"
+  }
+}

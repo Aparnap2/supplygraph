@@ -1,0 +1,24 @@
+import React, { useState, useEffect } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { BarChart3, FileText, Truck, TrendingUp, Package, Clock, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, Plus, Loader2 } from 'lucide-react'
+
+export const Route = createFileRoute('/')({
+  component: Dashboard,
+})
+
+function Dashboard() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <h1 className="text-3xl font-bold">SupplyGraph Dashboard</h1>
+      <p>Test count: {count}</p>
+      <button
+        onClick={() => setCount(count + 1)}
+        className="px-4 py-2 bg-blue-600 text-white rounded"
+      >
+        Increment Count
+      </button>
+    </div>
+  )
+}
