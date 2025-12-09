@@ -1,35 +1,22 @@
-// Export all AGUI components
-export { ThinkingLoader } from './components/ThinkingLoader';
-export { QuoteApprovalCard } from './components/QuoteApprovalCard';
-export { InventoryCheck } from './components/InventoryCheck';
-export { QuoteFetcher } from './components/QuoteFetcher';
-export { PaymentProcessor } from './components/PaymentProcessor';
-export { PaymentSuccess } from './components/PaymentSuccess';
-export { ErrorCard } from './components/ErrorCard';
+/**
+ * SupplyGraph UI Components
+ * AGUI (Agent-Generated UI) components for procurement workflow
+ */
 
-// Export utilities
-export { cn } from './utils/cn';
+export { default as QuoteApprovalCard } from './QuoteApprovalCard'
+export { default as ThinkingLoader } from './ThinkingLoader'
+export { default as InventoryCheck } from './InventoryCheck'
+export { default as QuoteFetcher } from './QuoteFetcher'
+export { default as PaymentProcessor } from './PaymentProcessor'
+export { default as PaymentSuccess } from './PaymentSuccess'
+export { default as ErrorCard } from './ErrorCard'
 
-// Export types
-export type {
-  ThinkingLoaderProps,
-  QuoteApprovalCardProps,
-  InventoryCheckProps,
-  QuoteFetcherProps,
-  PaymentProcessorProps,
-  PaymentSuccessProps,
-  ErrorCardProps,
-  AGUIEvent,
-  WorkflowAGUIEvent,
-  AGUIComponentName,
-  AGUIComponentProps,
-  WebSocketMessage,
-  UIComponentMessage,
-  ChatMessage,
-  ErrorMessage,
-  WorkflowState,
-  ChatRequest,
-  ChatResponse,
-  WorkflowResumeRequest,
-  WorkflowResumeResponse
-} from '@supplygraph/shared-types';
+// Component types for AGUI system
+export interface AGUIComponentProps {
+  onAction?: (action: string, data?: any) => void
+  threadId?: string
+  orgId?: string
+}
+
+// Re-export common component types
+export type { AGUIEvent } from '../types'
