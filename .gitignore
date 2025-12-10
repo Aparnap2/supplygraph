@@ -60,6 +60,11 @@ logs/
 packages/db/generated/
 packages/db/node_modules/
 apps/ai-service/prisma_client/__pycache__/
+apps/ai-service/prisma_client/_vendor/
+apps/ai-service/prisma_client/binaries/
+apps/ai-service/prisma_client/cli/
+apps/ai-service/prisma_client/engine/
+apps/ai-service/prisma_client/generator/
 
 # Test coverage
 coverage/
@@ -74,3 +79,19 @@ coverage/
 
 # Docker
 .dockerignore
+
+# Lock files (keep source of truth)
+*.lock
+pnpm-lock.yaml
+uv.lock
+
+# Environment files (keep templates)
+.env
+.env.local
+.env.production
+.env.test
+
+# Build artifacts
+.next/
+out/
+build/
