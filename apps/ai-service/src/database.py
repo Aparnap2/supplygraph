@@ -4,6 +4,12 @@ import asyncio
 from typing import Optional
 
 import structlog
+import sys
+import os
+
+# Add the correct path to the generated client
+sys.path.insert(0, '/home/aparna/Desktop/supplygraph_mvp/packages/db/generated/client')
+
 from prisma import Prisma
 
 from .config import get_settings
@@ -13,9 +19,8 @@ logger = structlog.get_logger(__name__)
 # Global database client instance
 _db_client: Optional[Prisma] = None
 
-
 async def get_db_client() -> Prisma:
-    """Get or create the database client instance."""
+    """Get or create a database client instance."""
     global _db_client
     
     if _db_client is None:
@@ -24,12 +29,12 @@ async def get_db_client() -> Prisma:
         logger.info("🔌 Connecting to database", url=settings.database_url.split("@")[-1])
         
         _db_client = Prisma()
+        
         await _db_client.connect()
         
         logger.info("✅ Database connection established")
     
     return _db_client
-
 
 async def close_db_client() -> None:
     """Close the database client connection."""
@@ -40,7 +45,6 @@ async def close_db_client() -> None:
         await _db_client.disconnect()
         _db_client = None
         logger.info("✅ Database connection closed")
-
 
 async def get_db() -> Prisma:
     """Dependency to get database client for FastAPI routes."""
