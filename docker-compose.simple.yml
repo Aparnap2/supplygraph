@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # POSTGRESQL DATABASE
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: supplygraph-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=supplygraph
+      - POSTGRES_PASSWORD=supplygraph123
+      - POSTGRES_DB=supplygraph
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - supplygraph-network
+
+  # =============================================================================
+  # REDIS/VALKEY CACHE
+  # =============================================================================
+  redis:
+    image: valkey/valkey:7.2-alpine
+    container_name: supplygraph-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - supplygraph-network
+
+  # =============================================================================
+  # AI SERVICE (FASTAPI + LANGGRAPH)
+  # =============================================================================
+  ai-service:
+    build:
+      context: ./apps/ai-service
+      dockerfile: Dockerfile
+    container_name: supplygraph-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://supplygraph:supplygraph123@postgres:5432/supplygraph
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_key}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+    volumes:
+      - ./apps/ai-service:/app
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - supplygraph-network
+
+  # =============================================================================
+  # NEXT.JS FRONTEND
+  # =============================================================================
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: supplygraph-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-pk_test_key}
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - ai-service
+    networks:
+      - supplygraph-network
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  supplygraph-network:
+    driver: bridge
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  postgres_data:
+  redis_data:

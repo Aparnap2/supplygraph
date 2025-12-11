@@ -1,0 +1,238 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # SUPPLYGRAPH API SERVICE
+  # =============================================================================
+  api:
+    build:
+      context: ./apps/ai-service
+      dockerfile: Dockerfile
+    container_name: supplygraph-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "9090:9090"  # Metrics port
+    environment:
+      - DATABASE_URL=postgresql://supplygraph:${POSTGRES_PASSWORD}@postgres:5432/supplygraph_prod
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
+    volumes:
+      - ./logs:/app/logs
+      - ./credentials:/app/credentials
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - supplygraph-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =============================================================================
+  # POSTGRESQL DATABASE
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: supplygraph-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=supplygraph
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=supplygraph_prod
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - supplygraph-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supplygraph"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # REDIS/VALKEY CACHE
+  # =============================================================================
+  redis:
+    image: valkey/valkey:7.2-alpine
+    container_name: supplygraph-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: valkey-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    networks:
+      - supplygraph-network
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # OLLAMA AI SERVICE (DEV ONLY - REMOVED FOR PRODUCTION)
+  # =============================================================================
+  # Production uses OpenAI API instead of local Ollama
+
+  # =============================================================================
+  # MONITORING STACK
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: supplygraph-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - supplygraph-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: supplygraph-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - supplygraph-network
+
+  # =============================================================================
+  # METRICS EXPORTERS
+  # =============================================================================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: supplygraph-postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://supplygraph:${POSTGRES_PASSWORD}@postgres:5432/supplygraph_prod?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+    networks:
+      - supplygraph-network
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: supplygraph-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+    networks:
+      - supplygraph-network
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: supplygraph-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - supplygraph-network
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: supplygraph-cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - supplygraph-network
+
+# =============================================================================
+  # NEXT.JS FRONTEND
+  # =============================================================================
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: supplygraph-web
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    depends_on:
+      - api
+    networks:
+      - supplygraph-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  supplygraph-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

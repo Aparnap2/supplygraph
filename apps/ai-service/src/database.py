@@ -8,7 +8,7 @@ import sys
 import os
 
 # Add the correct path to the generated client
-sys.path.insert(0, '/home/aparna/Desktop/supplygraph_mvp/packages/db/generated/client')
+sys.path.insert(0, '/home/aparna/Desktop/supplygraph_mvp/apps/ai-service/prisma_client')
 
 from prisma import Prisma
 
