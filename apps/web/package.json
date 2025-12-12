@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest",
+    "test:api": "vitest run tests/api",
+    "test:unit": "vitest run tests/unit",
+    "test:components": "vitest run tests/components",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "next": "16.0.8",
@@ -21,6 +26,11 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@playwright/test": "^1.44.0",
+    "vitest": "^1.6.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/jest-dom": "^6.4.5",
+    "jsdom": "^24.0.0"
   }
 }

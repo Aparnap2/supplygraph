@@ -8,9 +8,16 @@ import sys
 import os
 
 # Add the correct path to the generated client
-sys.path.insert(0, '/home/aparna/Desktop/supplygraph_mvp/apps/ai-service/prisma_client')
+sys.path.insert(0, '/home/aparna/Desktop/supplygraph_mvp/apps/ai-service')
 
-from prisma import Prisma
+# Import Prisma from the generated client to avoid "Client hasn't been generated" error
+try:
+    from prisma_client import Prisma as GeneratedPrisma
+    # Make Prisma available in this module's namespace
+    Prisma = GeneratedPrisma
+except ImportError as e:
+    logger.error(f"Failed to import Prisma from generated client: {e}")
+    raise ImportError(f"Could not import Prisma client: {e}") from e
 
 from .config import get_settings
 
