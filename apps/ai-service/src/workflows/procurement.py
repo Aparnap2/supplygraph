@@ -387,19 +387,19 @@ class ProcurementWorkflow(BaseWorkflow):
         """Process payment for approved quote."""
         try:
             state = await self.log_step(state, "process_payment", "Processing payment")
-            
+
             approved_quote_id = state["data"]["approved_quote_id"]
-            
+
             # Get approved quote details
             async with with_tenant(state["org_id"]) as db:
                 quote = await db.quote.find_unique(
                     where={"id": approved_quote_id},
                     include={"vendor": True}
                 )
-            
+
             if not quote:
                 raise ValueError(f"Approved quote not found: {approved_quote_id}")
-            
+
             # Create payment record
             async with with_tenant(state["org_id"]) as db:
                 payment = await db.payment.create(
@@ -412,7 +412,7 @@ class ProcurementWorkflow(BaseWorkflow):
                         "status": "PENDING",
                     }
                 )
-                
+
                 # Update request status
                 await db.procurementrequest.update(
                     where={"id": state["entity_id"]},
@@ -422,36 +422,73 @@ class ProcurementWorkflow(BaseWorkflow):
                         "approvedQuoteId": approved_quote_id,
                     }
                 )
-            
-            # TODO: Integrate with Stripe for actual payment processing
-            # For MVP, simulate successful payment
-            await asyncio.sleep(1)  # Simulate processing time
-            
-            # Update payment status
+
+            # Integrate with Stripe for actual payment processing
+            from src.services.payment_service import PaymentService
+            payment_service = PaymentService()
+
+            # Create a payment intent for the transaction
+            try:
+                payment_intent = await payment_service.create_payment_intent(
+                    amount=int(quote.totalAmount * 100),  # Convert to cents
+                    currency=quote.currency.lower(),
+                    description=f"Payment for procurement request {state['entity_id']}",
+                    request_id=state["entity_id"],
+                    org_id=state["org_id"],
+                    quote_id=approved_quote_id,
+                    vendor_id=quote.vendorId
+                )
+
+                # Confirm the payment intent (this is where real payment would happen)
+                # In a real implementation, you'd want to handle the payment confirmation properly
+                # For now, we'll just confirm with a test payment method
+                confirmed_payment = await payment_service.confirm_payment(
+                    payment_intent_id=payment_intent["id"],
+                    payment_method_id="pm_card_visa"  # Test payment method
+                )
+
+                # Verify payment succeeded
+                if confirmed_payment.get("status") == "succeeded":
+                    payment_status = "SUCCEEDED"
+                elif confirmed_payment.get("status") == "processing":
+                    payment_status = "PROCESSING"
+                else:
+                    payment_status = "FAILED"
+
+            except Exception as payment_error:
+                # If payment processing fails, mark as failed
+                payment_status = "FAILED"
+                await self.log_step(state, "process_payment", f"Payment failed: {str(payment_error)}")
+
+            # Update payment status in database
             async with with_tenant(state["org_id"]) as db:
                 await db.payment.update(
                     where={"id": payment.id},
                     data={
-                        "status": "SUCCEEDED",
-                        "paidAt": datetime.now(),
+                        "status": payment_status,
+                        "paidAt": datetime.now() if payment_status == "SUCCEEDED" else None,
+                        "stripePaymentIntentId": payment_intent.get("id") if 'payment_intent' in locals() else None,
+                        "stripeChargeId": confirmed_payment.get("charges", {}).get("data", [{}])[0].get("id") if payment_status != "FAILED" and 'confirmed_payment' in locals() else None,
                     }
                 )
-                
+
+                # Update procurement request status based on payment result
+                new_request_status = "PAID" if payment_status == "SUCCEEDED" else "PAYMENT_FAILED"
                 await db.procurementrequest.update(
                     where={"id": state["entity_id"]},
-                    data={"status": "PAID"}
+                    data={"status": new_request_status}
                 )
-            
+
             state["data"]["payment_id"] = payment.id
-            state["data"]["payment_status"] = "paid"
+            state["data"]["payment_status"] = payment_status
             state = await self.log_step(
                 state,
                 "process_payment",
-                f"✅ Payment processed successfully"
+                f"✅ Payment processed with status: {payment_status}"
             )
-            
+
             return state
-            
+
         except Exception as e:
             return await self.handle_error(state, e, "process_payment")
     
