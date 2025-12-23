@@ -1,7 +1,7 @@
 {
-  "name": "@supplygraph/db",
+  "name": "@dealgraph/db",
   "version": "0.1.0",
-  "description": "Shared Prisma schema and database client for SupplyGraph",
+  "description": "Shared Prisma schema and database client for DealGraph",
   "main": "index.ts",
   "scripts": {
     "db:generate": "prisma generate",

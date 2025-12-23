@@ -145,6 +145,61 @@ exports.Prisma.UserScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ContactScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  address: 'address',
+  website: 'website',
+  metadata: 'metadata',
+  orgId: 'orgId',
+  type: 'type',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.DealScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  type: 'type',
+  orgId: 'orgId',
+  status: 'status',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ClientScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  address: 'address',
+  metadata: 'metadata',
+  contactId: 'contactId',
+  orgId: 'orgId',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ProposalScalarFieldEnum = {
+  id: 'id',
+  rfpContent: 'rfpContent',
+  status: 'status',
+  totalValue: 'totalValue',
+  pdfUrl: 'pdfUrl',
+  stripeInvoiceId: 'stripeInvoiceId',
+  orgId: 'orgId',
+  dealId: 'dealId',
+  clientId: 'clientId',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.VendorScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -168,6 +223,7 @@ exports.Prisma.ProcurementRequestScalarFieldEnum = {
   priority: 'priority',
   orgId: 'orgId',
   createdBy: 'createdBy',
+  dealId: 'dealId',
   approvedVendorId: 'approvedVendorId',
   approvedQuoteId: 'approvedQuoteId',
   metadata: 'metadata',
@@ -308,6 +364,30 @@ exports.UserRole = exports.$Enums.UserRole = {
   VIEWER: 'VIEWER'
 };
 
+exports.ContactType = exports.$Enums.ContactType = {
+  VENDOR: 'VENDOR',
+  CLIENT: 'CLIENT'
+};
+
+exports.DealType = exports.$Enums.DealType = {
+  BUY: 'BUY',
+  SELL: 'SELL'
+};
+
+exports.DealStatus = exports.$Enums.DealStatus = {
+  ACTIVE: 'ACTIVE',
+  CLOSED: 'CLOSED',
+  CANCELLED: 'CANCELLED'
+};
+
+exports.ProposalStatus = exports.$Enums.ProposalStatus = {
+  DRAFT: 'DRAFT',
+  SENT: 'SENT',
+  WON: 'WON',
+  LOST: 'LOST',
+  CANCELLED: 'CANCELLED'
+};
+
 exports.RequestStatus = exports.$Enums.RequestStatus = {
   CREATED: 'CREATED',
   QUOTES_REQUESTED: 'QUOTES_REQUESTED',
@@ -361,6 +441,10 @@ exports.WorkflowStatus = exports.$Enums.WorkflowStatus = {
 exports.Prisma.ModelName = {
   Organization: 'Organization',
   User: 'User',
+  Contact: 'Contact',
+  Deal: 'Deal',
+  Client: 'Client',
+  Proposal: 'Proposal',
   Vendor: 'Vendor',
   ProcurementRequest: 'ProcurementRequest',
   Quote: 'Quote',

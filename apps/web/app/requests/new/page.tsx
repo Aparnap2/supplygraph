@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { api, CreateRequestPayload } from '../../../lib/api';
+import { api, CreateRequestPayload } from '@/src/shared';
 
 export default function NewRequestPage() {
   const [title, setTitle] = useState('');

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api, ProcurementRequest, Quote } from '../../../../lib/api';
+import { api, ProcurementRequest, Quote } from '@/src/shared';
 
 export default function ApproveQuotesPage() {
   const { id } = useParams();

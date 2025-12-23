@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "dealgraph-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,23 +14,27 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@dealgraph/db": "workspace:*",
+    "lucide-react": "^0.562.0",
     "next": "16.0.8",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.44.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.4.5",
+    "@testing-library/react": "^16.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.0.8",
+    "jsdom": "^24.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "@playwright/test": "^1.44.0",
-    "vitest": "^1.6.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.4.5",
-    "jsdom": "^24.0.0"
+    "vitest": "^1.6.0"
   }
 }

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { api, ProcurementRequest } from '../../lib/api';
+import { api, ProcurementRequest } from '@/src/shared';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ProcurementRequest[]>([]);

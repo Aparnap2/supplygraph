@@ -1,4 +1,4 @@
-// SupplyGraph - Canonical Prisma Schema
+// DealGraph - Dual-Sided B2B Commerce Agent
 // Multi-tenant with Row-Level Security (RLS)
 
 generator client {
@@ -35,7 +35,11 @@ model Organization {
   // Relations
   users    User[]
   vendors  Vendor[]
+  clients  Client[]
+  contacts Contact[]
+  deals    Deal[]
   requests ProcurementRequest[]
+  proposals Proposal[]
   quotes   Quote[]
   payments Payment[]
   auditLogs AuditLog[]
@@ -72,6 +76,135 @@ enum UserRole {
   ADMIN
   MEMBER
   VIEWER
+}
+
+// ===============================
+// SHARED CONTACT MODELS
+// ===============================
+
+model Contact {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  address     Json?    // { street, city, state, zip, country }
+  website     String?
+  metadata    Json?    // Custom fields
+
+  // Multi-tenant
+  orgId       String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Polymorphic: can represent Vendor or Client contacts
+  type        ContactType
+
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("contacts")
+}
+
+enum ContactType {
+  VENDOR
+  CLIENT
+}
+
+// ===============================
+// DEAL GROUPING MODEL
+// ===============================
+
+model Deal {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Q4 Office Supplies" or "Enterprise Software RFP"
+  type        DealType // BUY or SELL
+
+  // Multi-tenant
+  orgId       String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  status      DealStatus @default(ACTIVE)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations (optional grouping)
+  procurementRequests ProcurementRequest[]
+  proposals           Proposal[]
+
+  @@map("deals")
+}
+
+enum DealType {
+  BUY
+  SELL
+}
+
+enum DealStatus {
+  ACTIVE
+  CLOSED
+  CANCELLED
+}
+
+// ===============================
+// SALES MODELS
+// ===============================
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  address     Json?
+  metadata    Json?
+  contactId   String?  // Optional link to generic Contact
+
+  // Multi-tenant
+  orgId       String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  proposals   Proposal[]
+
+  @@map("clients")
+}
+
+model Proposal {
+  id             String        @id @default(cuid())
+  rfpContent     String        @db.Text  // RFP text or content
+  status         ProposalStatus @default(DRAFT)
+  totalValue     Decimal?      @db.Decimal(12, 2)
+  pdfUrl         String?
+  stripeInvoiceId String?
+
+  // Multi-tenant
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Relations
+  dealId         String?
+  deal           Deal? @relation(fields: [dealId], references: [id])
+  clientId       String
+  client         Client @relation(fields: [clientId], references: [id])
+
+  // Workflow
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("proposals")
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  WON
+  LOST
+  CANCELLED
 }
 
 // ================================
@@ -117,6 +250,10 @@ model ProcurementRequest {
   // Request metadata
   createdBy   String
   creator     User @relation(fields: [createdBy], references: [id])
+
+  // Optional deal grouping
+  dealId      String?
+  deal        Deal? @relation(fields: [dealId], references: [id])
   
   // Approval & Payment
   approvedVendorId String?

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { api, Vendor } from '../../lib/api';
+import { api, Vendor } from '@/src/shared';
 
 export default function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);

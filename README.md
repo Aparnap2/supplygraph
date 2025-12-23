@@ -1,20 +1,21 @@
-# SupplyGraph MVP
+# DealGraph MVP
 
-**Intelligent Procurement Automation Platform**
+**Dual-Sided B2B Commerce Agent**
 
-SupplyGraph automates the complete procure-to-pay workflow using LangGraph AI orchestration, from purchase requests to vendor quotes, comparison, approval, and payment execution.
+DealGraph automates both procurement (buying) and proposals (selling) workflows using LangGraph AI orchestration, from purchase requests to vendor quotes, and RFP responses to deal closures.
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        SupplyGraph MVP                          │
+│                        DealGraph MVP                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Frontend (Next.js)          │  AI Service (FastAPI + LangGraph) │
 │  ├─ Authentication           │  ├─ Procurement Workflows         │
-│  ├─ Multi-tenant UI          │  ├─ Quote Processing             │
-│  ├─ Vendor Management        │  ├─ Email Integration            │
-│  ├─ Quote Comparison         │  ├─ Document Processing          │
+│  ├─ Multi-tenant UI          │  ├─ Sales Proposal Workflows      │
+│  ├─ Vendor/Client Mgmt       │  ├─ Quote/RFP Processing         │
+│  ├─ Quote Comparison         │  ├─ Email Integration            │
+│  ├─ Proposal Generation      │  ├─ Document Processing          │
 │  └─ Approval Workflows       │  └─ Payment Orchestration        │
 ├─────────────────────────────────────────────────────────────────┤
 │                    Shared Database Layer                        │
@@ -38,7 +39,7 @@ SupplyGraph automates the complete procure-to-pay workflow using LangGraph AI or
 
 ```bash
 git clone <repository>
-cd supplygraph
+cd dealgraph
 
 # Install shared database package
 cd packages/db
@@ -85,7 +86,7 @@ pnpm dev
 ## 📋 Project Structure
 
 ```
-supplygraph/
+dealgraph/
 ├── packages/
 │   └── db/                    # Shared Prisma schema + client
 │       ├── schema.prisma      # Canonical database schema
@@ -94,9 +95,12 @@ supplygraph/
 │
 ├── apps/
 │   ├── web/                  # Next.js frontend + BFF
+│   │   ├── src/             # Feature-based architecture
+│   │   │   ├── features/    # Procurement & Sales features
+│   │   │   └── shared/      # Common utilities
 │   │   ├── app/             # App Router pages
-│   │   ├── components/      # React components
-│   │   ├── lib/            # Utilities and configs
+│   │   ├── components/      # React components (deprecated, moving to src/)
+│   │   ├── lib/            # Utilities and configs (deprecated, moving to src/)
 │   │   └── package.json    # Frontend dependencies
 │   │
 │   └── ai-service/          # FastAPI + LangGraph backend
@@ -115,7 +119,7 @@ supplygraph/
 
 ## 🔄 Workflows
 
-### Procurement Lifecycle
+### Procurement Lifecycle (Buying)
 
 ```mermaid
 graph LR
@@ -131,7 +135,21 @@ graph LR
 
 **LangGraph States**: `CREATED → QUOTES_REQUESTED → QUOTES_RECEIVED → APPROVED → PAID → COMPLETED`
 
-### Quote Processing
+### Sales Lifecycle (Selling)
+
+```mermaid
+graph LR
+    A[Receive RFP] --> B[Create Client]
+    B --> C[Draft Proposal]
+    C --> D[Generate PDF]
+    D --> E[Send Proposal]
+    E --> F[Follow Up]
+    F --> G[Win/Lose Deal]
+```
+
+**Proposal States**: `DRAFT → SENT → WON/LOST`
+
+### Quote/RFP Processing
 
 ```mermaid
 graph LR
@@ -189,13 +207,16 @@ USING (org_id = current_setting('app.current_tenant')::text);
 
 ### ✅ Implemented (MVP)
 - [x] Multi-tenant authentication (Better Auth)
-- [x] Procurement request creation
+- [x] Procurement request creation (Buying)
 - [x] Vendor management
+- [x] Client management (Selling)
+- [x] Proposal creation and management (Selling)
 - [x] LangGraph workflow orchestration
 - [x] Email integration (Gmail API)
 - [x] Document processing (Docling + LLM)
-- [x] Quote extraction and normalization
+- [x] Quote/RFP extraction and normalization
 - [x] Quote comparison interface
+- [x] Proposal generation interface
 - [x] Approval workflows
 - [x] Payment integration (Stripe)
 - [x] Audit logging
@@ -233,7 +254,7 @@ pnpm test
 ### Integration Tests
 ```bash
 # Start test databases
-docker run -d --name test-postgres -e POSTGRES_DB=supplygraph_test -p 5433:5432 postgres:16-alpine
+docker run -d --name test-postgres -e POSTGRES_DB=dealgraph_test -p 5433:5432 postgres:16-alpine
 docker run -d --name test-redis -p 6380:6379 redis:7-alpine
 
 # Run full test suite
@@ -356,7 +377,7 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 - **Issues**: GitHub Issues
 - **Discussions**: GitHub Discussions
-- **Email**: support@supplygraph.com
+- **Email**: support@dealgraph.com
 
 ---
 

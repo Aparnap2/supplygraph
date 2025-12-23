@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api, ProcurementRequest, Vendor } from '../../../../lib/api';
+import { api, ProcurementRequest, Vendor } from '@/src/shared';
 
 export default function SendRFQPage() {
   const { id } = useParams();

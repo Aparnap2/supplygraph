@@ -1,33 +1,33 @@
-Understood. I’ll produce the **final updated PRD** for SupplyGraph — reflecting decisions so far: hybrid-service architecture, shared Prisma schema, minimal-MVP scope, multi-tenant, AI-assisted procurement workflow.
-
-You can treat this as the **canonical spec** going forward. Use it to build, communicate with stakeholders, or onboard collaborators/investors.
 
 ---
 
-# 📄 SupplyGraph — Finalized MVP PRD
+# 📄 DealGraph — Finalized MVP PRD
 
 ## 1. Product Vision & Scope
 
 **Mission:**
-SupplyGraph automates the procurement workflow for SMEs: from purchase request to vendor quote collection, comparison, approval, and payment — with auditability, multi-tenant isolation and minimal manual overhead.
+DealGraph is a dual-sided B2B commerce agent that automates both procurement (buying) and proposals (selling) workflows. It handles the complete cycle from purchase requests to vendor quotes, and from RFP responses to deal closures — with AI assistance, auditability, multi-tenant isolation, and minimal manual overhead.
 
 **MVP Scope:**
-Only core procurement loop. All non-essential features (analytics, ERP integrations, advanced vendor sourcing) postponed to post-MVP phases.
+Core procurement and sales loops. All non-essential features (advanced analytics, ERP integrations, marketplace vendor discovery) postponed to post-MVP phases.
 
 **Target Users:**
-Procurement manager or operations head at SMEs; business owners needing a streamlined procurement process without building internal tooling.
+Procurement managers, sales teams, and operations heads at SMEs; business owners needing streamlined buying and selling processes without building internal tooling.
 
 **Primary Value Proposition:**
 
-* Faster procurement cycles
+* Faster procurement and sales cycles
 * Lower friction and manual overhead
-* Transparent quote comparison and audit trail
+* Transparent quote comparison and proposal generation
+* AI-assisted RFP processing and proposal drafting
 * Multi-organization support with isolation
+* Unified platform for buy-side and sell-side commerce
 
 ---
 
 ## 2. Core Use-Cases / User Journeys
 
+### Procurement (Buying) Side
 | Use Case                       | Flow / Outcome                                                                                                                      |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **Create Procurement Request** | User logs in → selects/creates Org → fills a form or uploads sheet specifying items required → request created.                     |
@@ -38,16 +38,33 @@ Procurement manager or operations head at SMEs; business owners needing a stream
 | **Close & Log Request**        | Request status updated (paid/closed), inventory or procurement logs updated (optional), full record saved for audit.                |
 | **Multi-Tenant Isolation**     | Each Org’s data (vendors, requests, quotes, users) fully isolated; users only see data of their org.                                |
 
+### Sales (Selling) Side
+| Use Case                       | Flow / Outcome                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Receive & Process RFP**      | Client sends RFP via email or form → system extracts requirements → creates proposal draft with AI assistance.                     |
+| **Create Client Profile**      | User adds client information → links to proposal → maintains client relationship data.                                             |
+| **Draft Proposal**             | AI analyzes RFP content → generates proposal text → user reviews and edits → attaches pricing and terms.                            |
+| **Generate Proposal PDF**      | System creates professional PDF → includes company branding → ready for client delivery.                                           |
+| **Send & Track Proposal**      | Email proposal to client → track open rates and responses → update proposal status.                                                |
+| **Win/Lose Deal Tracking**     | Mark proposals as won/lost → update deal status → maintain sales pipeline analytics.                                               |
+
+### Shared Features
+| Use Case                       | Flow / Outcome                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Multi-Tenant Isolation**     | Each Org's data (vendors, clients, requests, proposals, users) fully isolated; users only see data of their org.                    |
+| **Unified Dashboard**          | Single platform with role-based access to buying and selling features.                                                             |
+
 ---
 
 ## 3. Technical Stack & Architecture (MVP Setup)
 
-* **Frontend / BFF**: Next.js + React (TanStack Start) + shadcn/ui + Tailwind
-* **Backend API / AI Service**: FastAPI + LangGraph
+* **Frontend / BFF**: Next.js + React + shadcn/ui + Tailwind (dual-sided UI with separate layouts for procurement and sales)
+* **Backend API / AI Service**: FastAPI + LangGraph (handles both procurement workflows and proposal generation)
 * **Database**: PostgreSQL + Prisma ORM (shared schema) + RLS for tenant isolation
-* **Background Queue / Cache**: Valkey (Redis-compatible) for async tasks (email sending, rate-limit, retries)
-* **Email Integration**: Gmail/SMTP client for RFQ sending and vendor email parsing
+* **Background Queue / Cache**: Valkey (Redis-compatible) for async tasks (email sending, AI processing, rate-limit, retries)
+* **Email Integration**: Gmail/SMTP client for RFQ sending, RFP processing, and vendor/client email parsing
 * **Payment**: Stripe (test mode) — for demonstration / early users; other gateways can be added later
+* **PDF Generation**: For professional proposal documents
 * **Deployment (MVP)**: Docker Compose for dev; containerized services for prod
 
 ### Data Access Setup
@@ -67,7 +84,10 @@ model Organization {
   createdAt DateTime @default(now())
   users     User[]
   vendors   Vendor[]
+  clients   Client[]
+  deals     Deal[]
   requests  ProcurementRequest[]
+  proposals Proposal[]
 }
 
 model User {
@@ -85,7 +105,58 @@ model Vendor {
   name      String
   email     String
   metadata  Json?
-  requests  ProcurementRequest[] @relation("VendorRequests")
+  quotes    Quote[]
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  email     String
+  proposals Proposal[]
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  orgId       String
+  name        String
+  type        DealType // BUY or SELL
+  status      DealStatus @default(ACTIVE)
+  requests    ProcurementRequest[]
+  proposals   Proposal[]
+}
+
+model Proposal {
+  id          String   @id @default(cuid())
+  orgId       String
+  clientId    String
+  client      Client @relation(fields:[clientId], references:[id])
+  dealId      String?
+  title       String
+  content     String @db.Text
+  status      ProposalStatus @default(DRAFT)
+  totalValue  Decimal?
+  pdfUrl      String?
+  createdAt   DateTime @default(now())
+}
+
+enum DealType {
+  BUY
+  SELL
+}
+
+enum DealStatus {
+  ACTIVE
+  CLOSED
+  CANCELLED
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  WON
+  LOST
+  CANCELLED
 }
 
 model ProcurementRequest {
